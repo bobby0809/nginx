@@ -18,6 +18,7 @@ typedef struct {
     ngx_ssl_t                       ssl;
 
     ngx_flag_t                      prefer_server_ciphers;
+    ngx_flag_t                      certificate_compression;
     ngx_flag_t                      early_data;
     ngx_flag_t                      reject_handshake;
 
@@ -38,6 +39,8 @@ typedef struct {
     ngx_array_t                    *certificate_values;
     ngx_array_t                    *certificate_key_values;
 
+    ngx_ssl_cache_t                *certificate_cache;
+
     ngx_str_t                       dhparam;
     ngx_str_t                       ecdh_curve;
     ngx_str_t                       client_certificate;
@@ -46,6 +49,7 @@ typedef struct {
 
     ngx_str_t                       ciphers;
 
+    ngx_array_t                    *ech_files;
     ngx_array_t                    *passwords;
     ngx_array_t                    *conf_commands;
 

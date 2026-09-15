@@ -23,7 +23,7 @@
 #define NGX_HTTP_V3_HQ_ALPN_PROTO                  "\x0Ahq-interop"
 #define NGX_HTTP_V3_HQ_PROTO                       "hq-interop"
 
-#define NGX_HTTP_V3_VARLEN_INT_LEN                 4
+#define NGX_HTTP_V3_VARLEN_INT_LEN                 8
 #define NGX_HTTP_V3_PREFIX_INT_LEN                 11
 
 #define NGX_HTTP_V3_STREAM_CONTROL                 0x00
@@ -138,6 +138,7 @@ struct ngx_http_v3_session_s {
 
     unsigned                      goaway:1;
     unsigned                      hq:1;
+    unsigned                      created_streams:NGX_HTTP_V3_MAX_KNOWN_STREAM;
 
     ngx_connection_t             *known_streams[NGX_HTTP_V3_MAX_KNOWN_STREAM];
 };

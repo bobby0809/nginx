@@ -1,0 +1,14 @@
+name: buildbot
+
+on:
+  push:
+    branches:
+      - master
+      - 'stable-1.*'
+
+permissions:
+  contents: read
+
+jobs:
+  buildbot:
+    uses: nginx/ci-self-hosted/.github/workflows/nginx-buildbot.yml@main

@@ -6,9 +6,9 @@ TEMP =		tmp
 
 CC =		cl
 OBJS =		objs.msvc8
-OPENSSL =	openssl-3.0.14
-ZLIB =		zlib-1.3.1
-PCRE =		pcre2-10.39
+OPENSSL =	openssl-3.5.8
+ZLIB =		zlib-1.3.2
+PCRE =		pcre2-10.48
 
 
 release: export
@@ -76,7 +76,8 @@ win32:
 		--with-stream_realip_module				\
 		--with-stream_ssl_preread_module			\
 		--with-openssl=$(OBJS)/lib/$(OPENSSL)			\
-		--with-openssl-opt="no-asm no-tests -D_WIN32_WINNT=0x0501" \
+		--with-openssl-opt="no-asm no-tests no-makedepend	\
+			-D_WIN32_WINNT=0x0501"				\
 		--with-http_ssl_module					\
 		--with-mail_ssl_module					\
 		--with-stream_ssl_module
@@ -92,7 +93,7 @@ zip: export
 	sed -i '' -e "s/$$/`printf '\r'`/" $(TEMP)/$(NGINX)/conf/*
 
 	mv $(TEMP)/$(NGINX)/LICENSE $(TEMP)/$(NGINX)/docs.new
-	mv $(TEMP)/$(NGINX)/README $(TEMP)/$(NGINX)/docs.new
+	mv $(TEMP)/$(NGINX)/*.md $(TEMP)/$(NGINX)/docs.new
 	mv $(TEMP)/$(NGINX)/docs/html $(TEMP)/$(NGINX)
 
 	rm -r $(TEMP)/$(NGINX)/docs
@@ -106,7 +107,7 @@ zip: export
 	cp -p $(OBJS)/lib/$(OPENSSL)/LICENSE.txt			\
 		$(TEMP)/$(NGINX)/docs/OpenSSL.LICENSE
 
-	cp -p $(OBJS)/lib/$(PCRE)/LICENCE				\
+	cp -p $(OBJS)/lib/$(PCRE)/LICENCE.md				\
 		$(TEMP)/$(NGINX)/docs/PCRE.LICENCE
 
 	sed -ne '/^ (C) 1995-20/,/^  jloup@gzip\.org/p'			\

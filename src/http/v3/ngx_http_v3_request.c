@@ -665,6 +665,15 @@ ngx_http_v3_process_header(ngx_http_request_t *r, ngx_str_t *name,
         }
 
     } else {
+        cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
+
+        if (r->headers_in.count++ >= cscf->max_headers) {
+            ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                          "client sent too many header lines");
+            ngx_http_finalize_request(r, NGX_HTTP_REQUEST_HEADER_TOO_LARGE);
+            return NGX_ERROR;
+        }
+
         h = ngx_list_push(&r->headers_in.headers);
         if (h == NULL) {
             ngx_http_close_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
@@ -904,6 +913,7 @@ ngx_http_v3_init_pseudo_headers(ngx_http_request_t *r)
     u_char     *p;
     ngx_int_t   rc;
     ngx_str_t   host;
+    in_port_t   port;
 
     if (r->request_line.len) {
         return NGX_OK;
@@ -961,11 +971,11 @@ ngx_http_v3_init_pseudo_headers(ngx_http_request_t *r)
         host.len = r->host_end - r->host_start;
         host.data = r->host_start;
 
-        rc = ngx_http_validate_host(&host, r->pool, 0);
+        rc = ngx_http_validate_host(&host, &port, r->pool, 0);
 
         if (rc == NGX_DECLINED) {
             ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
-                          "client sent invalid host in request line");
+                          "client sent invalid \":authority\" header");
             goto failed;
         }
 
@@ -979,6 +989,7 @@ ngx_http_v3_init_pseudo_headers(ngx_http_request_t *r)
         }
 
         r->headers_in.server = host;
+        r->port = port;
     }
 
     if (ngx_list_init(&r->headers_in.headers, r->pool, 20,
@@ -1003,11 +1014,52 @@ ngx_http_v3_process_request_header(ngx_http_request_t *r)
 {
     ssize_t                  n;
     ngx_buf_t               *b;
+    ngx_str_t                host;
     ngx_connection_t        *c;
     ngx_http_v3_session_t   *h3c;
     ngx_http_v3_srv_conf_t  *h3scf;
 
     c = r->connection;
+
+    if (r->headers_in.connection) {
+        ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                      "client sent \"Connection\" header");
+        ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
+        return NGX_ERROR;
+    }
+
+    if (r->headers_in.keep_alive) {
+        ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                      "client sent \"Keep-Alive\" header");
+        ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
+        return NGX_ERROR;
+    }
+
+    if (r->headers_in.transfer_encoding) {
+        ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                      "client sent \"Transfer-Encoding\" header");
+        ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
+        return NGX_ERROR;
+    }
+
+    if (r->headers_in.upgrade) {
+        ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                      "client sent \"Upgrade\" header");
+        ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
+        return NGX_ERROR;
+    }
+
+    if (r->headers_in.te
+        && (r->headers_in.te->next
+            || r->headers_in.te->value.len != 8
+            || ngx_strncasecmp(r->headers_in.te->value.data,
+                               (u_char *) "trailers", 8) != 0))
+    {
+        ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                      "client sent invalid \"TE\" header");
+        ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
+        return NGX_ERROR;
+    }
 
     if (ngx_http_v3_init_pseudo_headers(r) != NGX_OK) {
         return NGX_ERROR;
@@ -1034,11 +1086,13 @@ ngx_http_v3_process_request_header(ngx_http_request_t *r)
         goto failed;
     }
 
-    if (r->headers_in.host) {
-        if (r->headers_in.host->value.len != r->headers_in.server.len
-            || ngx_memcmp(r->headers_in.host->value.data,
-                          r->headers_in.server.data,
-                          r->headers_in.server.len)
+    if (r->headers_in.host && r->host_end) {
+
+        host.len = r->host_end - r->host_start;
+        host.data = r->host_start;
+
+        if (r->headers_in.host->value.len != host.len
+            || ngx_memcmp(r->headers_in.host->value.data, host.data, host.len)
                != 0)
         {
             ngx_log_error(NGX_LOG_INFO, c->log, 0,
@@ -1213,7 +1267,7 @@ ngx_http_v3_construct_cookie_header(ngx_http_request_t *r)
     if (hh->handler(r, h, hh->offset) != NGX_OK) {
         /*
          * request has been finalized already
-         * in ngx_http_process_multi_header_lines()
+         * in ngx_http_process_header_line()
          */
         return NGX_ERROR;
     }
